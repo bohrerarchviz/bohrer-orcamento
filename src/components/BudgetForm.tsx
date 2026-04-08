@@ -1,4 +1,4 @@
-import { useState, useMemo, ReactNode, useRef, useEffect } from "react";
+import { useState, useMemo, ReactNode, useRef, useEffect, FormEvent, DragEvent, ChangeEvent } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Check, 
@@ -9,7 +9,10 @@ import {
   CheckCircle2, 
   AlertCircle,
   Plus,
-  FileText
+  FileText,
+  Upload,
+  File as FileIcon,
+  X
 } from "lucide-react";
 import { BudgetFormData, INITIAL_FORM_DATA } from "../types";
 import { cn } from "../lib/utils";
@@ -148,10 +151,10 @@ ${labels.type}: ${formData.projectType}
 
 ${sections.services.toUpperCase()}
 ${labels.external}: ${yesNo(formData.needsExternalImages)}
-${formData.needsExternalImages ? `${t.budget.quantity}: ${formData.externalQuantity}\n${t.budget.viewTypes}: ${formData.externalViews.join(", ")}\nMood: ${formData.externalMood}` : ""}
+${formData.needsExternalImages ? `${t.budget.quantity}: ${formData.externalQuantity}\n${t.budget.viewTypes}: ${formData.externalViews.join(", ")}${formData.externalViews.includes("Outro") ? ` (${formData.externalViewsOther || (language === "pt" ? "não especificado" : "not specified")})` : ""}\nMood: ${formData.externalMood}` : ""}
 
 ${labels.interior}: ${yesNo(formData.needsInteriorImages)}
-${formData.needsInteriorImages ? `${t.budget.quantity}: ${formData.interiorQuantity}\n${t.budget.interiorSpaces}: ${formData.interiorSpaces.join(", ")}` : ""}
+${formData.needsInteriorImages ? `${t.budget.quantity}: ${formData.interiorQuantity}\n${t.budget.interiorSpaces}: ${formData.interiorSpaces.join(", ")}${formData.interiorSpaces.includes("Outro") ? ` (${formData.interiorSpacesOther || (language === "pt" ? "não especificado" : "not specified")})` : ""}` : ""}
 
 ${labels.video}: ${yesNo(formData.needsVideo)}
 ${formData.needsVideo ? `
@@ -173,7 +176,7 @@ ${formData.needsPlantaHumanizada ? `
 
 ${sections.material.toUpperCase()}
 ${labels.modeled}: ${formData.isAlreadyModeled === true ? `${t.budget.yes} (${formData.fileFormat})` : formData.isAlreadyModeled === false ? `${t.budget.no} (${formData.availableMaterial.join(", ")})` : "N/A"}
-${t.budget.materialsDefined}: ${formData.materialsDefined}
+${formData.relevantFiles.length > 0 ? `${language === "pt" ? "Arquivos Anexados" : "Attached Files"}: ${formData.relevantFiles.map(f => f.name).join(", ")}\n` : ""}${t.budget.materialsDefined}: ${formData.materialsDefined}
 ${formData.materialsNotes ? `${language === "pt" ? "Notas Materiais" : "Materials Notes"}: ${formData.materialsNotes}` : ""}
 
 ${labels.surroundings}: ${formData.includeSurroundings}
@@ -183,8 +186,6 @@ ${formData.humanizationNotes ? `${language === "pt" ? "Notas Humanização" : "H
 
 ${sections.delivery.toUpperCase()}
 ${labels.deadline}: ${formData.deadline}
-${labels.urgent}: ${yesNo(formData.isUrgent)}
-${formData.isUrgent ? `${language === "pt" ? "Motivo Urgência" : "Urgency Reason"}: ${formData.urgencyReason}` : ""}
 
 ${t.budget.additionalNotes.toUpperCase()}
 ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicional." : "No additional observations.")}
@@ -236,22 +237,30 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
     ];
 
     if (formData.needsExternalImages) {
+      const views = formData.externalViews.includes("Outro") 
+        ? formData.externalViews.map(v => v === "Outro" ? `Outro: ${formData.externalViewsOther || (language === "pt" ? "não especificado" : "not specified")}` : v).join(", ")
+        : getVal(formData.externalViews);
+
       sections.push({
         title: language === "pt" ? "Detalhes das Imagens Externas" : "External Images Details",
         data: [
           [t.budget.quantity, getVal(formData.externalQuantity)],
-          [t.budget.viewTypes, getVal(formData.externalViews)],
+          [t.budget.viewTypes, views],
           [t.budget.mood, getVal(formData.externalMood)],
         ]
       });
     }
 
     if (formData.needsInteriorImages) {
+      const spaces = formData.interiorSpaces.includes("Outro") 
+        ? formData.interiorSpaces.map(s => s === "Outro" ? `Outro: ${formData.interiorSpacesOther || (language === "pt" ? "não especificado" : "not specified")}` : s).join(", ")
+        : getVal(formData.interiorSpaces);
+
       sections.push({
         title: language === "pt" ? "Detalhes das Imagens Interiores" : "Interior Images Details",
         data: [
           [t.budget.quantity, getVal(formData.interiorQuantity)],
-          [t.budget.interiorSpaces, getVal(formData.interiorSpaces)],
+          [t.budget.interiorSpaces, spaces],
         ]
       });
     }
@@ -313,8 +322,6 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
       title: language === "pt" ? "Prazos" : "Deadlines",
       data: [
         [t.budget.deadline, getVal(formData.deadline)],
-        [t.budget.urgent, yesNo(formData.isUrgent)],
-        [language === "pt" ? "Motivo Urgência" : "Urgency Reason", getVal(formData.urgencyReason)],
       ]
     });
 
@@ -347,27 +354,25 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
     setIsPdfGenerated(true);
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     setIsSubmitting(true);
     setError(null);
 
-    const encode = (data: any) => {
-      return Object.keys(data)
-        .map(key => encodeURIComponent(key) + "=" + encodeURIComponent(
-          Array.isArray(data[key]) ? data[key].join(", ") : data[key]
-        ))
-        .join("&");
-    };
+    const form = e.currentTarget;
+    const formDataObj = new FormData(form);
+    
+    // Add relevant files to FormData
+    formData.relevantFiles.forEach((file) => {
+      formDataObj.append("relevantFiles[]", file);
+    });
+    
+    // Add formattedEmailBody
+    formDataObj.append("formattedEmailBody", formattedEmailBody);
 
     try {
       const response = await fetch("/", {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: encode({ 
-          "form-name": "orcamento",
-          ...formData,
-          formattedEmailBody // Include the formatted body for convenience
-        }),
+        body: formDataObj,
       });
 
       if (response.ok) {
@@ -400,9 +405,27 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
           <CheckCircle2 className="w-10 h-10" />
         </div>
         <h2 className="text-3xl font-medium mb-6 tracking-tight">{t.budget.successTitle}</h2>
-        <p className="text-lg text-brand-muted leading-relaxed mb-12">
+        <p className="text-lg text-brand-muted leading-relaxed mb-8">
           {t.budget.successDesc}
         </p>
+
+        {formData.relevantFiles.length > 0 && (
+          <div className="mb-12 space-y-3">
+            <p className="text-xs font-bold text-brand-muted uppercase tracking-widest mb-4">Arquivos Anexados:</p>
+            <div className="flex flex-col gap-2 max-w-sm mx-auto">
+              {formData.relevantFiles.map((file, index) => (
+                <div key={index} className="flex items-center gap-3 p-3 bg-brand-offwhite rounded-xl border border-brand-accent/10">
+                  <FileIcon className="w-4 h-4 text-brand-dark/40" />
+                  <div className="flex-1 text-left min-w-0">
+                    <p className="text-xs font-bold text-brand-dark truncate">{file.name}</p>
+                    <p className="text-[10px] text-brand-muted uppercase">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <button 
           onClick={() => window.location.reload()}
           className="px-8 py-4 bg-brand-dark text-white rounded-xl font-medium hover:bg-brand-dark/90 transition-all"
@@ -416,14 +439,26 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
   return (
     <form 
       name="orcamento" 
+      method="POST"
+      action="/"
       data-netlify="true" 
-      onSubmit={(e) => e.preventDefault()}
+      data-netlify-honeypot="bot-field"
+      encType="multipart/form-data"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (currentStep === 5) handleSubmit(e);
+      }}
       className="max-w-3xl mx-auto w-full"
     >
       <input type="hidden" name="form-name" value="orcamento" />
+      <div hidden>
+        <label>
+          Don't fill this out if you're human: <input name="bot-field" />
+        </label>
+      </div>
       {/* Progress Bar */}
-      <div className="mb-12">
-        <div className="flex justify-between items-center mb-4 px-2">
+      <div className="mb-4 md:mb-12">
+        <div className="flex justify-between items-center mb-3 md:mb-4 px-2">
           <span className="text-xs font-medium text-brand-muted uppercase tracking-widest">
             {t.budget.stepLabel} {currentStep + 1} {t.budget.of} {STEPS.length}
           </span>
@@ -441,7 +476,7 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
         </div>
       </div>
 
-      <div className="bg-white p-8 md:p-12 rounded-3xl border border-brand-accent/20 shadow-sm min-h-[500px] flex flex-col">
+      <div className="bg-white p-5 md:p-12 rounded-3xl border border-brand-accent/20 shadow-sm min-h-[400px] md:min-h-[500px] flex flex-col">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentStep}
@@ -452,17 +487,17 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
             className="flex-1"
           >
             {currentStep < 5 && (
-              <div className="mb-6">
-                <p className="text-[10px] text-brand-muted uppercase tracking-widest italic">
+              <div className="mb-4 md:mb-6">
+                <p className="text-[10px] text-brand-muted tracking-wide">
                   * {t.budget.requiredNote}
                 </p>
               </div>
             )}
 
             {currentStep === 0 && (
-              <div className="space-y-8">
+              <div className="space-y-4 md:space-y-8">
                 <SectionTitle title={t.budget.basicInfoTitle} />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
                   <InputField id="field-clientName" name="clientName" label={t.budget.clientName} value={formData.clientName} onChange={v => updateField("clientName", v)} placeholder={t.budget.clientNamePlaceholder} required error={errors.clientName} />
                   <InputField id="field-companyName" name="companyName" label={t.budget.companyName} value={formData.companyName} onChange={v => updateField("companyName", v)} placeholder={t.budget.companyNamePlaceholder} />
                   <InputField id="field-projectName" name="projectName" label={t.budget.projectName} value={formData.projectName} onChange={v => updateField("projectName", v)} placeholder={t.budget.projectNamePlaceholder} required error={errors.projectName} />
@@ -471,7 +506,7 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
                   <InputField id="field-location" name="location" label={t.budget.location} value={formData.location} onChange={v => updateField("location", v)} placeholder={t.budget.locationPlaceholder} />
                 </div>
                 <div id="field-projectType" className="space-y-4">
-                  <p className="text-sm font-medium text-brand-muted uppercase tracking-widest">{t.budget.projectType} *</p>
+                  <p className="text-[10px] md:text-[11px] font-bold text-brand-muted uppercase tracking-[0.2em]">{t.budget.projectType} *</p>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {t.budget.projectTypes.map(type => (
                       <SelectButton 
@@ -489,21 +524,21 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
             )}
 
             {currentStep === 1 && (
-              <div className="space-y-12">
+              <div className="space-y-4 md:space-y-12">
                 <SectionTitle title={t.budget.servicesTitle} />
                 
                 {/* External Images */}
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <p className="text-lg font-medium">{t.budget.externalImages}</p>
+                <div className="space-y-2 md:space-y-6">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
+                    <p className="text-base md:text-lg font-medium text-brand-dark">{t.budget.externalImages}</p>
                     <YesNoToggle value={formData.needsExternalImages} onChange={v => updateField("needsExternalImages", v)} />
                   </div>
                   {formData.needsExternalImages && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-6 pt-4 border-t border-brand-accent/10">
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-4 md:space-y-6 pt-3 md:pt-4 border-t border-brand-accent/10">
                       <InputField id="field-externalQuantity" name="externalQuantity" label={t.budget.quantity} value={formData.externalQuantity} onChange={v => updateField("externalQuantity", v)} placeholder={t.budget.quantityPlaceholder} required error={errors.externalQuantity} />
-                      <div id="field-externalViews" className="space-y-4">
-                        <p className="text-sm font-medium text-brand-muted uppercase tracking-widest">{t.budget.viewTypes} *</p>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      <div id="field-externalViews" className="space-y-3 md:space-y-4">
+                        <p className="text-[10px] md:text-[11px] font-bold text-brand-muted uppercase tracking-[0.2em]">{t.budget.viewTypes} *</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3">
                           {t.budget.views.map(view => (
                             <MultiSelectButton 
                               key={view} 
@@ -515,6 +550,17 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
                           ))}
                         </div>
                         {errors.externalViews && <p className="text-xs text-red-500 mt-1">{errors.externalViews}</p>}
+                        
+                        {formData.externalViews.includes("Outro") && (
+                          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="pt-2">
+                            <InputField 
+                              label={language === "pt" ? "Outras Vistas" : "Other Views"}
+                              value={formData.externalViewsOther} 
+                              onChange={v => updateField("externalViewsOther", v)} 
+                              placeholder={t.budget.otherViewsPlaceholder} 
+                            />
+                          </motion.div>
+                        )}
                       </div>
                       <InputField id="field-externalMood" name="externalMood" label={t.budget.mood} value={formData.externalMood} onChange={v => updateField("externalMood", v)} placeholder={t.budget.moodPlaceholder} />
                     </motion.div>
@@ -522,17 +568,17 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
                 </div>
 
                 {/* Interior Images */}
-                <div className="space-y-6 border-t border-brand-accent/20 pt-8">
-                  <div className="flex items-center justify-between">
-                    <p className="text-lg font-medium">{t.budget.interiorImages}</p>
+                <div className="space-y-2 md:space-y-6 border-t border-brand-accent/20 pt-4 md:pt-8">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
+                    <p className="text-base md:text-lg font-medium text-brand-dark">{t.budget.interiorImages}</p>
                     <YesNoToggle value={formData.needsInteriorImages} onChange={v => updateField("needsInteriorImages", v)} />
                   </div>
                   {formData.needsInteriorImages && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-6 pt-4 border-t border-brand-accent/10">
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-4 md:space-y-6 pt-3 md:pt-4 border-t border-brand-accent/10">
                       <InputField id="field-interiorQuantity" name="interiorQuantity" label={t.budget.quantity} value={formData.interiorQuantity} onChange={v => updateField("interiorQuantity", v)} placeholder={t.budget.quantityPlaceholder} required error={errors.interiorQuantity} />
-                      <div id="field-interiorSpaces" className="space-y-4">
-                        <p className="text-sm font-medium text-brand-muted uppercase tracking-widest">{t.budget.interiorSpaces} *</p>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      <div id="field-interiorSpaces" className="space-y-3 md:space-y-4">
+                        <p className="text-[10px] md:text-[11px] font-bold text-brand-muted uppercase tracking-[0.2em]">{t.budget.interiorSpaces} *</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3">
                           {t.budget.spaces.map(space => (
                             <MultiSelectButton 
                               key={space} 
@@ -544,22 +590,33 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
                           ))}
                         </div>
                         {errors.interiorSpaces && <p className="text-xs text-red-500 mt-1">{errors.interiorSpaces}</p>}
+                        
+                        {formData.interiorSpaces.includes("Outro") && (
+                          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="pt-2">
+                            <InputField 
+                              label={language === "pt" ? "Outros Ambientes" : "Other Spaces"}
+                              value={formData.interiorSpacesOther} 
+                              onChange={v => updateField("interiorSpacesOther", v)} 
+                              placeholder={t.budget.otherSpacesPlaceholder} 
+                            />
+                          </motion.div>
+                        )}
                       </div>
                     </motion.div>
                   )}
                 </div>
 
                 {/* Video */}
-                <div className="space-y-6 border-t border-brand-accent/20 pt-8">
-                  <div className="flex items-center justify-between">
-                    <p className="text-lg font-medium">{t.budget.video}</p>
+                <div className="space-y-2 md:space-y-6 border-t border-brand-accent/20 pt-4 md:pt-8">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
+                    <p className="text-base md:text-lg font-medium text-brand-dark">{t.budget.video}</p>
                     <YesNoToggle value={formData.needsVideo} onChange={v => updateField("needsVideo", v)} />
                   </div>
                   {formData.needsVideo && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-6 pt-4 border-t border-brand-accent/10">
-                      <div id="field-videoType" className="space-y-4">
-                        <p className="text-sm font-medium text-brand-muted uppercase tracking-widest">{t.budget.videoType} *</p>
-                        <div className="flex gap-4">
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-4 md:space-y-6 pt-3 md:pt-4 border-t border-brand-accent/10">
+                      <div id="field-videoType" className="space-y-3 md:space-y-4">
+                        <p className="text-[10px] md:text-[11px] font-bold text-brand-muted uppercase tracking-[0.2em]">{t.budget.videoType} *</p>
+                        <div className="flex gap-3 md:gap-4">
                           {t.budget.videoTypes.map(type => (
                             <SelectButton 
                               key={type} 
@@ -574,9 +631,9 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
                       </div>
                       <InputField id="field-videoDuration" name="videoDuration" label={t.budget.videoDuration} value={formData.videoDuration} onChange={v => updateField("videoDuration", v)} placeholder={t.budget.videoDurationPlaceholder} />
                       
-                      <div id="field-videoFormat" className="space-y-4">
-                        <p className="text-sm font-medium text-brand-muted uppercase tracking-widest">{t.budget.videoFormat} *</p>
-                        <div className="flex gap-4">
+                      <div id="field-videoFormat" className="space-y-3 md:space-y-4">
+                        <p className="text-[10px] md:text-[11px] font-bold text-brand-muted uppercase tracking-[0.2em]">{t.budget.videoFormat} *</p>
+                        <div className="flex gap-3 md:gap-4">
                           {t.budget.videoFormats.map(fmt => (
                             <SelectButton 
                               key={fmt} 
@@ -592,9 +649,9 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
 
                       <TextArea id="field-videoEssential" name="videoEssential" label={t.budget.videoEssential} value={formData.videoEssential} onChange={v => updateField("videoEssential", v)} placeholder={t.budget.videoEssentialPlaceholder} required error={errors.videoEssential} />
                       
-                      <div id="field-videoTextOverlays" className="space-y-4">
-                        <p className="text-sm font-medium text-brand-muted uppercase tracking-widest">{t.budget.videoTextOverlays} *</p>
-                        <div className="flex gap-4">
+                      <div id="field-videoTextOverlays" className="space-y-3 md:space-y-4">
+                        <p className="text-[10px] md:text-[11px] font-bold text-brand-muted uppercase tracking-[0.2em]">{t.budget.videoTextOverlays} *</p>
+                        <div className="flex gap-3 md:gap-4">
                           {[t.budget.yes, t.budget.no].map(opt => (
                             <SelectButton 
                               key={opt} 
@@ -608,9 +665,9 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
                         {errors.videoTextOverlays && <p className="text-xs text-red-500 mt-1">{errors.videoTextOverlays}</p>}
                       </div>
 
-                      <div id="field-videoStyle" className="space-y-4">
-                        <p className="text-sm font-medium text-brand-muted uppercase tracking-widest">{t.budget.videoStyle} *</p>
-                        <div className="flex gap-4">
+                      <div id="field-videoStyle" className="space-y-3 md:space-y-4">
+                        <p className="text-[10px] md:text-[11px] font-bold text-brand-muted uppercase tracking-[0.2em]">{t.budget.videoStyle} *</p>
+                        <div className="flex gap-3 md:gap-4">
                           {t.budget.videoStyles.map(style => (
                             <SelectButton 
                               key={style} 
@@ -624,9 +681,9 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
                         {errors.videoStyle && <p className="text-xs text-red-500 mt-1">{errors.videoStyle}</p>}
                       </div>
 
-                      <div id="field-videoHasReferences" className="space-y-4">
-                        <p className="text-sm font-medium text-brand-muted uppercase tracking-widest">{t.budget.videoHasReferences} *</p>
-                        <div className="flex gap-4">
+                      <div id="field-videoHasReferences" className="space-y-3 md:space-y-4">
+                        <p className="text-[10px] md:text-[11px] font-bold text-brand-muted uppercase tracking-[0.2em]">{t.budget.videoHasReferences} *</p>
+                        <div className="flex gap-3 md:gap-4">
                           {[t.budget.yes, t.budget.no].map(opt => (
                             <SelectButton 
                               key={opt} 
@@ -657,13 +714,13 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
                 </div>
 
                 {/* Planta Humanizada */}
-                <div className="space-y-6 border-t border-brand-accent/20 pt-8">
-                  <div className="flex items-center justify-between">
-                    <p className="text-lg font-medium">{t.budget.plantaHumanizada}</p>
+                <div className="space-y-2 md:space-y-6 border-t border-brand-accent/20 pt-4 md:pt-8">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
+                    <p className="text-base md:text-lg font-medium text-brand-dark">{t.budget.plantaHumanizada}</p>
                     <YesNoToggle value={formData.needsPlantaHumanizada} onChange={v => updateField("needsPlantaHumanizada", v)} />
                   </div>
                   {formData.needsPlantaHumanizada && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-6 pt-4 border-t border-brand-accent/10">
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-4 md:space-y-6 pt-3 md:pt-4 border-t border-brand-accent/10">
                       <InputField id="field-plantaQuantity" name="plantaQuantity" label={t.budget.plantaQuantity} value={formData.plantaQuantity} onChange={v => updateField("plantaQuantity", v)} placeholder="Ex: 2" required error={errors.plantaQuantity} />
                       <TextArea id="field-plantaTypologies" name="plantaTypologies" label={t.budget.plantaTypologies} value={formData.plantaTypologies} onChange={v => updateField("plantaTypologies", v)} placeholder={t.budget.plantaTypologiesPlaceholder} required error={errors.plantaTypologies} />
                     </motion.div>
@@ -673,21 +730,23 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
             )}
 
             {currentStep === 2 && (
-              <div className="space-y-12">
+              <div className="space-y-4 md:space-y-12">
                 <SectionTitle title={t.budget.materialTitle} />
                 
-                <div id="field-isAlreadyModeled" className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <p className="text-lg font-medium">{t.budget.isModeled} *</p>
-                    <div className={cn("flex bg-brand-offwhite p-1 rounded-xl border transition-all", errors.isAlreadyModeled ? "border-red-300" : "border-brand-accent/10")}>
+                <div id="field-isAlreadyModeled" className="space-y-2 md:space-y-6">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
+                    <p className="text-base md:text-lg font-medium text-brand-dark">{t.budget.isModeled}<span className="whitespace-nowrap">&nbsp;*</span></p>
+                    <div className={cn("flex bg-brand-offwhite p-1 rounded-xl border transition-all w-fit", errors.isAlreadyModeled ? "border-red-300" : "border-brand-accent/10")}>
                       <button 
                         onClick={() => updateField("isAlreadyModeled", true)}
+                        type="button"
                         className={cn("px-6 py-2 rounded-lg text-xs font-bold transition-all", formData.isAlreadyModeled === true ? "bg-white text-brand-dark shadow-sm" : "text-brand-muted")}
                       >
                         {t.budget.yes}
                       </button>
                       <button 
                         onClick={() => updateField("isAlreadyModeled", false)}
+                        type="button"
                         className={cn("px-6 py-2 rounded-lg text-xs font-bold transition-all", formData.isAlreadyModeled === false ? "bg-white text-brand-dark shadow-sm" : "text-brand-muted")}
                       >
                         {t.budget.no}
@@ -697,9 +756,9 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
                   {errors.isAlreadyModeled && <p className="text-xs text-red-500 mt-1">{errors.isAlreadyModeled}</p>}
                   
                   {formData.isAlreadyModeled === true && (
-                    <motion.div id="field-fileFormat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4 pt-4 border-t border-brand-accent/10">
-                      <p className="text-sm font-medium text-brand-muted uppercase tracking-widest">{t.budget.fileFormat} *</p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <motion.div id="field-fileFormat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3 pt-3 md:pt-4 border-t border-brand-accent/10">
+                      <p className="text-[10px] md:text-[11px] font-bold text-brand-muted uppercase tracking-[0.2em]">{t.budget.fileFormat} *</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
                         {t.budget.formats.map(format => (
                           <SelectButton 
                             key={format} 
@@ -715,9 +774,9 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
                   )}
                   
                   {formData.isAlreadyModeled === false && (
-                    <motion.div id="field-availableMaterial" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4 pt-4 border-t border-brand-accent/10">
-                      <p className="text-sm font-medium text-brand-muted uppercase tracking-widest">{t.budget.availableMaterial} *</p>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <motion.div id="field-availableMaterial" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3 pt-3 md:pt-4 border-t border-brand-accent/10">
+                      <p className="text-[10px] md:text-[11px] font-bold text-brand-muted uppercase tracking-[0.2em]">{t.budget.availableMaterial} *</p>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3">
                         {t.budget.materials.map(mat => (
                           <MultiSelectButton 
                             key={mat} 
@@ -733,9 +792,9 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
                   )}
                 </div>
 
-                <div id="field-materialsDefined" className="space-y-6 border-t border-brand-accent/20 pt-8">
-                  <p className="text-lg font-medium">{t.budget.materialsDefined} *</p>
-                  <div className="flex gap-4">
+                <div id="field-materialsDefined" className="space-y-2 md:space-y-6 border-t border-brand-accent/20 pt-4 md:pt-8">
+                  <p className="text-base md:text-lg font-medium text-brand-dark">{t.budget.materialsDefined} *</p>
+                  <div className="flex gap-3 md:gap-4">
                     {t.budget.materialsOptions.map(opt => (
                       <SelectButton 
                         key={opt} 
@@ -749,8 +808,8 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
                   {errors.materialsDefined && <p className="text-xs text-red-500 mt-1">{errors.materialsDefined}</p>}
                   
                   {formData.materialsDefined && (
-                    <div className="p-4 bg-brand-offwhite rounded-xl border border-brand-accent/10">
-                      <p className="text-sm text-brand-dark font-medium">
+                    <div className="p-3 md:p-4 bg-brand-offwhite rounded-xl border border-brand-accent/10">
+                      <p className="text-sm text-brand-dark font-medium leading-relaxed">
                         {(formData.materialsDefined === "Sim" || formData.materialsDefined === "Yes" || formData.materialsDefined === "Parcialmente" || formData.materialsDefined === "Partially") 
                           ? t.budget.materialsGuidanceYes 
                           : t.budget.materialsGuidanceNo}
@@ -772,12 +831,12 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
             )}
 
             {currentStep === 3 && (
-              <div className="space-y-12">
+              <div className="space-y-4 md:space-y-12">
                 <SectionTitle title={t.budget.sceneTitle} />
                 
-                <div className="space-y-6">
-                  <p className="text-lg font-medium">{t.budget.surroundings}</p>
-                  <div className="flex gap-4">
+                <div className="space-y-2 md:space-y-6">
+                  <p className="text-base md:text-lg font-medium text-brand-dark">{t.budget.surroundings}</p>
+                  <div className="flex gap-3 md:gap-4">
                     {t.budget.surroundingsOptions.map(opt => (
                       <SelectButton 
                         key={opt} 
@@ -798,9 +857,9 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
                   )}
                 </div>
 
-                <div className="space-y-6 border-t border-brand-accent/20 pt-8">
-                  <p className="text-lg font-medium">{t.budget.humanization}</p>
-                  <div className="flex gap-4">
+                <div className="space-y-2 md:space-y-6 border-t border-brand-accent/20 pt-4 md:pt-8">
+                  <p className="text-base md:text-lg font-medium text-brand-dark">{t.budget.humanization}</p>
+                  <div className="flex gap-3 md:gap-4">
                     {t.budget.humanizationOptions.map(opt => (
                       <SelectButton 
                         key={opt} 
@@ -822,33 +881,28 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
             )}
 
             {currentStep === 4 && (
-              <div className="space-y-12">
+              <div className="space-y-4 md:space-y-12">
                 <SectionTitle title={t.budget.deliveryTitle} />
                 
-                <div className="space-y-8">
+                <div className="space-y-3 md:space-y-8">
                   <InputField name="deadline" label={t.budget.deadline} value={formData.deadline} onChange={v => updateField("deadline", v)} placeholder={t.budget.deadlinePlaceholder} />
                   
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <p className="text-lg font-medium">{t.budget.urgent}</p>
-                      <YesNoToggle value={formData.isUrgent} onChange={v => updateField("isUrgent", v)} />
-                    </div>
-                    {formData.isUrgent && (
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                        <TextArea name="urgencyReason" label={t.budget.urgencyReason} value={formData.urgencyReason} onChange={v => updateField("urgencyReason", v)} placeholder={t.budget.urgencyReasonPlaceholder} />
-                      </motion.div>
-                    )}
-                  </div>
-
                   <TextArea name="additionalNotes" label={t.budget.additionalNotes} value={formData.additionalNotes} onChange={v => updateField("additionalNotes", v)} placeholder={t.budget.additionalNotesPlaceholder} rows={6} />
+                  
+                  <FileUpload 
+                    label="Anexar documentos relevantes (PDF, DWG, referências, etc.)" 
+                    name="relevantFiles"
+                    files={formData.relevantFiles} 
+                    onFilesChange={(files) => updateField("relevantFiles", files)} 
+                  />
                 </div>
               </div>
             )}
 
             {currentStep === 5 && (
-              <div className="space-y-8">
+              <div className="space-y-4 md:space-y-8">
                 <SectionTitle title={t.budget.reviewTitle} />
-                <div className="space-y-6 max-h-[500px] overflow-y-auto pr-4 custom-scrollbar">
+                <div className="space-y-4 md:space-y-6 max-h-[400px] md:max-h-[500px] overflow-y-auto pr-4 custom-scrollbar">
                   <ReviewSection title={t.budget.reviewSections.basic}>
                     <ReviewItem label={t.budget.reviewLabels.client} value={formData.clientName} />
                     <ReviewItem label={t.budget.reviewLabels.company} value={formData.companyName} />
@@ -881,7 +935,6 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
 
                   <ReviewSection title={t.budget.reviewSections.delivery}>
                     <ReviewItem label={t.budget.reviewLabels.deadline} value={formData.deadline} />
-                    <ReviewItem label={t.budget.reviewLabels.urgent} value={formData.isUrgent ? t.budget.yes : t.budget.no} />
                   </ReviewSection>
                 </div>
 
@@ -958,30 +1011,32 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
         </AnimatePresence>
 
         {/* Navigation Buttons */}
-        <div className="mt-12 flex items-center justify-between pt-8 border-t border-brand-accent/20">
+        <div className="mt-8 md:mt-12 flex flex-col md:flex-row items-center justify-between gap-4 pt-6 md:pt-8 border-t border-brand-accent/20">
           <button
             onClick={prevStep}
+            type="button"
             disabled={isSubmitting}
             className={cn(
-              "flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium transition-all",
-              currentStep === 0 ? "opacity-0 pointer-events-none" : "text-brand-muted hover:text-brand-dark hover:bg-brand-offwhite"
+              "flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium transition-all w-full md:w-auto justify-center",
+              currentStep === 0 ? "hidden" : "bg-brand-accent/20 text-brand-dark hover:bg-brand-accent/30 border border-brand-accent/10 shadow-sm"
             )}
           >
             <ChevronLeft className="w-4 h-4" /> {t.budget.prev}
           </button>
 
           {currentStep === STEPS.length - 1 ? (
-            <div className="flex gap-4">
+            <div className="flex flex-col md:flex-row gap-3 md:gap-4 w-full md:w-auto">
               <button
                 onClick={generatePDF}
-                className="flex items-center gap-2 px-8 py-4 bg-brand-offwhite text-brand-dark rounded-xl font-bold transition-all border border-brand-accent/30 hover:shadow-md"
+                type="button"
+                className="flex items-center justify-center gap-2 px-6 md:px-8 py-3.5 md:py-4 bg-brand-offwhite text-brand-dark rounded-xl font-bold transition-all border border-brand-accent/30 hover:shadow-md text-sm md:text-base"
               >
                 {t.budget.generatePDF} <FileText className="w-4 h-4" />
               </button>
               <button
-                onClick={handleSubmit}
+                type="submit"
                 disabled={isSubmitting}
-                className="flex items-center gap-2 px-12 py-4 bg-brand-dark text-white rounded-xl font-bold hover:bg-brand-dark/90 transition-all shadow-xl shadow-brand-dark/10 disabled:opacity-50"
+                className="flex items-center justify-center gap-2 px-8 md:px-12 py-3.5 md:py-4 bg-brand-dark text-white rounded-xl font-bold hover:bg-brand-dark/90 transition-all shadow-xl shadow-brand-dark/10 disabled:opacity-50 text-sm md:text-base"
               >
                 {isSubmitting ? t.budget.submitting : (
                   <>
@@ -993,7 +1048,8 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
           ) : (
             <button
               onClick={nextStep}
-              className="flex items-center gap-2 px-12 py-4 bg-brand-dark text-white rounded-xl font-bold hover:bg-brand-dark/90 transition-all shadow-xl shadow-brand-dark/10"
+              type="button"
+              className="flex items-center justify-center gap-2 px-8 md:px-12 py-3.5 md:py-4 bg-brand-dark text-white rounded-xl font-bold hover:bg-brand-dark/90 transition-all shadow-xl shadow-brand-dark/10 w-full md:w-auto text-sm md:text-base"
             >
               {t.budget.next} <ChevronRight className="w-4 h-4" />
             </button>
@@ -1006,13 +1062,13 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
 
 // Helper Components
 function SectionTitle({ title }: { title: string }) {
-  return <h3 className="text-3xl font-bold tracking-tight mb-10">{title}</h3>;
+  return <h3 className="text-xl md:text-3xl font-bold tracking-tight mb-4 md:mb-10 text-brand-dark">{title}</h3>;
 }
 
 function InputField({ id, name, label, value, onChange, placeholder, type = "text", required = false, error }: { id?: string, name?: string, label: string, value: string, onChange: (v: string) => void, placeholder: string, type?: string, required?: boolean, error?: string }) {
   return (
-    <div id={id} className="space-y-3">
-      <label className="text-[11px] font-bold text-brand-muted uppercase tracking-[0.2em]">{label} {required && "*"}</label>
+    <div id={id} className="space-y-1 md:space-y-3">
+      <label className="text-[10px] md:text-[11px] font-bold text-brand-muted uppercase tracking-[0.2em]">{label} {required && "*"}</label>
       <input 
         type={type}
         name={name}
@@ -1020,7 +1076,7 @@ function InputField({ id, name, label, value, onChange, placeholder, type = "tex
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         className={cn(
-          "w-full px-5 py-4 bg-brand-offwhite border transition-all outline-none text-brand-dark placeholder:text-brand-muted/50 rounded-xl",
+          "w-full px-5 py-4 bg-brand-offwhite border transition-all outline-none text-brand-dark placeholder:text-brand-muted/50 placeholder:text-[13px] md:placeholder:text-sm rounded-xl",
           error ? "border-red-300 bg-red-50/30" : "border-transparent focus:bg-white focus:border-brand-dark/20"
         )}
       />
@@ -1031,8 +1087,8 @@ function InputField({ id, name, label, value, onChange, placeholder, type = "tex
 
 function TextArea({ id, name, label, value, onChange, placeholder, rows = 3, required = false, error }: { id?: string, name?: string, label: string, value: string, onChange: (v: string) => void, placeholder: string, rows?: number, required?: boolean, error?: string }) {
   return (
-    <div id={id} className="space-y-3">
-      <label className="text-[11px] font-bold text-brand-muted uppercase tracking-[0.2em]">{label} {required && "*"}</label>
+    <div id={id} className="space-y-1 md:space-y-3">
+      <label className="text-[10px] md:text-[11px] font-bold text-brand-muted uppercase tracking-[0.2em]">{label} {required && "*"}</label>
       <textarea 
         name={name}
         value={value}
@@ -1040,7 +1096,7 @@ function TextArea({ id, name, label, value, onChange, placeholder, rows = 3, req
         placeholder={placeholder}
         rows={rows}
         className={cn(
-          "w-full px-5 py-4 bg-brand-offwhite border transition-all outline-none text-brand-dark placeholder:text-brand-muted/50 resize-none rounded-xl",
+          "w-full px-5 py-4 bg-brand-offwhite border transition-all outline-none text-brand-dark placeholder:text-brand-muted/50 placeholder:text-[13px] md:placeholder:text-sm resize-none rounded-xl",
           error ? "border-red-300 bg-red-50/30" : "border-transparent focus:bg-white focus:border-brand-dark/20"
         )}
       />
@@ -1054,7 +1110,7 @@ function SelectButton({ label, selected, onClick, error }: { label: string, sele
     <button
       onClick={onClick}
       className={cn(
-        "flex-1 px-4 py-3 rounded-xl text-sm font-bold transition-all border",
+        "flex-1 px-4 py-3 rounded-xl text-[11px] md:text-sm font-bold transition-all border",
         selected 
           ? "bg-brand-dark text-white border-brand-dark shadow-md" 
           : cn("bg-brand-offwhite text-brand-muted hover:border-brand-accent/50", error ? "border-red-200" : "border-transparent")
@@ -1070,7 +1126,7 @@ function MultiSelectButton({ label, selected, onClick, error }: { label: string,
     <button
       onClick={onClick}
       className={cn(
-        "flex items-center justify-between px-4 py-3 rounded-xl text-[11px] font-bold transition-all border",
+        "flex items-center justify-between px-4 py-3 rounded-xl text-[10px] md:text-[11px] font-bold transition-all border",
         selected 
           ? "bg-brand-dark text-white border-brand-dark shadow-sm" 
           : cn("bg-brand-offwhite text-brand-muted hover:border-brand-accent/50", error ? "border-red-200" : "border-transparent")
@@ -1088,12 +1144,14 @@ function YesNoToggle({ value, onChange }: { value: boolean, onChange: (v: boolea
     <div className="flex bg-brand-offwhite p-1 rounded-xl border border-brand-accent/10">
       <button 
         onClick={() => onChange(true)}
+        type="button"
         className={cn("px-6 py-2 rounded-lg text-xs font-bold transition-all", value ? "bg-white text-brand-dark shadow-sm" : "text-brand-muted")}
       >
         {t.budget.yes}
       </button>
       <button 
         onClick={() => onChange(false)}
+        type="button"
         className={cn("px-6 py-2 rounded-lg text-xs font-bold transition-all", !value ? "bg-white text-brand-dark shadow-sm" : "text-brand-muted")}
       >
         {t.budget.no}
@@ -1119,6 +1177,143 @@ function ReviewItem({ label, value }: { label: string, value: string | undefined
     <div className="flex justify-between items-baseline gap-4">
       <span className="text-[11px] text-brand-muted uppercase tracking-[0.2em] font-bold whitespace-nowrap">{label}</span>
       <span className="text-sm font-medium text-brand-dark text-right">{value}</span>
+    </div>
+  );
+}
+
+function FileUpload({ 
+  label, 
+  name,
+  files, 
+  onFilesChange, 
+  accept = ".pdf,.dwg,.jpg,.jpeg,.png" 
+}: { 
+  label: string, 
+  name: string,
+  files: File[], 
+  onFilesChange: (files: File[]) => void,
+  accept?: string
+}) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDragOver = (e: DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const processFiles = (newFiles: FileList | null) => {
+    if (!newFiles) return;
+    
+    const validFiles: File[] = [];
+    let hasLargeFile = false;
+
+    Array.from(newFiles).forEach(file => {
+      if (file.size <= 10 * 1024 * 1024) {
+        validFiles.push(file);
+      } else {
+        hasLargeFile = true;
+      }
+    });
+
+    if (hasLargeFile) {
+      setError("Alguns arquivos são muito grandes. Limite de 10MB por arquivo.");
+    } else {
+      setError(null);
+    }
+
+    if (validFiles.length > 0) {
+      onFilesChange([...files, ...validFiles]);
+    }
+  };
+
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    processFiles(e.dataTransfer.files);
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    processFiles(e.target.files);
+  };
+
+  const removeFile = (index: number) => {
+    const newFiles = [...files];
+    newFiles.splice(index, 1);
+    onFilesChange(newFiles);
+  };
+
+  return (
+    <div className="space-y-4">
+      <label className="text-[10px] md:text-[11px] font-bold text-brand-muted uppercase tracking-[0.2em] leading-relaxed block">{label}</label>
+      <div 
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+        className={cn(
+          "relative group cursor-pointer border-2 border-dashed rounded-2xl p-10 transition-all duration-300 text-center",
+          "bg-white/5 backdrop-blur-sm",
+          isDragging 
+            ? "border-brand-dark bg-brand-dark/5 scale-[1.01]" 
+            : "border-brand-accent/30 hover:border-brand-dark/40 hover:bg-brand-dark/[0.02]",
+          error && "border-red-500/50 bg-red-500/[0.02]"
+        )}
+      >
+        <input 
+          type="file" 
+          name={name}
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          accept={accept}
+          multiple
+          className="hidden"
+        />
+        
+        <div className="flex flex-col items-center gap-4">
+          <div className={cn(
+            "w-14 h-14 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300",
+            error ? "bg-red-50 text-red-500" : "bg-brand-offwhite text-brand-dark/40"
+          )}>
+            <Upload className="w-7 h-7" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-bold text-brand-dark">Clique ou arraste para anexar documentos</p>
+            <p className="text-[10px] text-brand-muted uppercase tracking-wider">PDF, DWG, Imagens (Máx 10MB por arquivo)</p>
+          </div>
+        </div>
+      </div>
+
+      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+
+      {files.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+          {files.map((file, index) => (
+            <div key={index} className="flex items-center gap-3 p-3 bg-brand-offwhite rounded-xl border border-brand-accent/10 group/file">
+              <FileIcon className="w-4 h-4 text-brand-dark/40" />
+              <div className="flex-1 text-left min-w-0">
+                <p className="text-xs font-bold text-brand-dark truncate">{file.name}</p>
+                <p className="text-[10px] text-brand-muted uppercase">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+              </div>
+              <button 
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeFile(index);
+                }}
+                className="p-1.5 text-brand-muted hover:text-red-500 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

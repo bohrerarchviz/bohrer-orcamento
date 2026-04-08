@@ -12,11 +12,13 @@ export interface BudgetFormData {
   needsExternalImages: boolean;
   externalQuantity: string;
   externalViews: string[];
+  externalViewsOther: string;
   externalMood: string;
 
   needsInteriorImages: boolean;
   interiorQuantity: string;
   interiorSpaces: string[];
+  interiorSpacesOther: string;
 
   needsVideo: boolean;
   videoType: string;
@@ -48,9 +50,8 @@ export interface BudgetFormData {
 
   // Step 5: Delivery
   deadline: string;
-  isUrgent: boolean;
-  urgencyReason: string;
   additionalNotes: string;
+  relevantFiles: File[];
 }
 
 export const INITIAL_FORM_DATA: BudgetFormData = {
@@ -64,10 +65,12 @@ export const INITIAL_FORM_DATA: BudgetFormData = {
   needsExternalImages: false,
   externalQuantity: "",
   externalViews: [],
+  externalViewsOther: "",
   externalMood: "",
   needsInteriorImages: false,
   interiorQuantity: "",
   interiorSpaces: [],
+  interiorSpacesOther: "",
   needsVideo: false,
   videoType: "",
   videoDuration: "",
@@ -91,7 +94,6 @@ export const INITIAL_FORM_DATA: BudgetFormData = {
   includeHumanization: "",
   humanizationNotes: "",
   deadline: "",
-  isUrgent: false,
-  urgencyReason: "",
   additionalNotes: "",
+  relevantFiles: [],
 };

@@ -42,7 +42,7 @@ export const translations = {
       email: "E-mail",
       emailPlaceholder: "seu@email.com",
       phone: "Telefone / WhatsApp",
-      phonePlaceholder: "+55 (XX) XXXXX-XXXX",
+      phonePlaceholder: "Ex: +351 XXX XXX XXX",
       location: "Localização",
       locationPlaceholder: "Cidade, Estado ou País",
       projectType: "Tipo de Projeto",
@@ -54,12 +54,14 @@ export const translations = {
       quantityPlaceholder: "Ex: 4 imagens",
       viewTypes: "Tipos de Vistas",
       views: ["Fachada Principal", "Fachada Posterior", "Área da Piscina", "Jardim", "Vista de Rua", "Vista Aérea", "Outro"],
+      otherViewsPlaceholder: "Descreva quais outras vistas",
       mood: "Mood / Horário Preferido",
       moodPlaceholder: "Ex: Diurno, Pôr do sol, Crepúsculo...",
       
       interiorImages: "Imagens de Interiores?",
       interiorSpaces: "Espaços Necessários",
       spaces: ["Estar", "Cozinha", "Jantar", "Quarto", "Suíte Master", "Banheiro", "Terraço", "Lobby", "Escritório", "Outro"],
+      otherSpacesPlaceholder: "Descreva quais outros ambientes",
       
       video: "Necessita de Vídeo?",
       videoType: "Tipo de Vídeo",
@@ -153,7 +155,7 @@ export const translations = {
       successDesc: "Sua solicitação de orçamento foi enviada com sucesso. Analisaremos as informações e entraremos em contato em breve.",
       backHome: "Voltar ao Início",
       
-      requiredNote: "campos obrigatórios (resposta obrigatória)",
+      requiredNote: "Resposta obrigatória",
       fieldRequired: "Este campo é obrigatório",
       selectAtLeastOne: "Selecione pelo menos uma opção",
       indicateQuantity: "Indique a quantidade",
@@ -163,8 +165,8 @@ export const translations = {
       whatsapp: "WhatsApp",
       emailLabel: "Email",
       error: "Não foi possível enviar o e-mail automaticamente. Por favor, use a opção de cópia manual abaixo.",
-      yes: "SIM",
-      no: "NÃO"
+      yes: "Sim",
+      no: "Não"
     },
     layout: {
       back: "Voltar",
@@ -212,7 +214,7 @@ export const translations = {
       email: "Email",
       emailPlaceholder: "your@email.com",
       phone: "Phone / WhatsApp",
-      phonePlaceholder: "+55 (XX) XXXXX-XXXX",
+      phonePlaceholder: "Ex: +351 XXX XXX XXX",
       location: "Location",
       locationPlaceholder: "City, State or Country",
       projectType: "Project Type",
@@ -224,12 +226,14 @@ export const translations = {
       quantityPlaceholder: "Ex: 4 images",
       viewTypes: "View Types",
       views: ["Main Facade", "Rear Facade", "Pool Area", "Garden", "Street View", "Aerial View", "Other"],
+      otherViewsPlaceholder: "Describe which other views",
       mood: "Mood / Preferred Time",
       moodPlaceholder: "Ex: Daylight, Sunset, Dusk...",
       
       interiorImages: "Interior Images?",
       interiorSpaces: "Required Spaces",
       spaces: ["Living Room", "Kitchen", "Dining Room", "Bedroom", "Master Bedroom", "Bathroom", "Terrace", "Lobby", "Office", "Other"],
+      otherSpacesPlaceholder: "Describe which other spaces",
       
       video: "Need Video?",
       videoType: "Video Type",
@@ -323,7 +327,7 @@ export const translations = {
       successDesc: "Your budget request has been successfully sent. We will review the information and get back to you soon.",
       backHome: "Back to Home",
       
-      requiredNote: "required fields (mandatory response)",
+      requiredNote: "Mandatory response",
       fieldRequired: "This field is required",
       selectAtLeastOne: "Select at least one option",
       indicateQuantity: "Indicate the quantity",
@@ -333,8 +337,8 @@ export const translations = {
       whatsapp: "WhatsApp",
       emailLabel: "Email",
       error: "Could not send the email automatically. Please use the manual copy option below.",
-      yes: "YES",
-      no: "NO"
+      yes: "Yes",
+      no: "No"
     },
     layout: {
       back: "Back",

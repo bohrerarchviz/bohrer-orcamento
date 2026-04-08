@@ -22,11 +22,11 @@ export default function Contact() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8 }}
-      className="max-w-2xl mx-auto w-full bg-white p-12 rounded-3xl border border-brand-accent/20 shadow-sm"
+      className="max-w-3xl mx-auto w-full bg-white p-8 md:p-12 rounded-3xl border border-brand-accent/20 shadow-sm"
     >
-      <h2 className="text-3xl font-bold mb-12 tracking-tight text-center">{t.contact.title}</h2>
+      <h2 className="text-2xl md:text-3xl font-bold mb-8 md:mb-12 tracking-tight text-center">{t.contact.title}</h2>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-x-16 md:gap-y-12">
         <div className="space-y-8">
           <ContactItem 
             icon={<Mail className="w-5 h-5" />}
@@ -95,14 +95,16 @@ function ContactItem({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-start gap-4 group"
+      className="flex items-center gap-4 md:gap-5 group"
     >
-      <div className="p-3 rounded-xl bg-brand-offwhite group-hover:bg-brand-dark group-hover:text-white transition-all duration-300">
+      <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-xl bg-brand-offwhite group-hover:bg-brand-dark group-hover:text-white transition-all duration-300 shrink-0">
         {icon}
       </div>
-      <div>
-        <p className="text-[11px] font-bold text-brand-muted uppercase tracking-[0.2em] mb-1">{label}</p>
-        <p className="text-base font-semibold group-hover:text-brand-dark transition-colors">{value}</p>
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] md:text-[11px] font-bold text-brand-muted uppercase tracking-[0.2em] mb-0.5">{label}</p>
+        <p className="text-sm md:text-[15px] font-semibold group-hover:text-brand-dark transition-colors leading-tight md:whitespace-nowrap">
+          {value}
+        </p>
       </div>
     </a>
   );

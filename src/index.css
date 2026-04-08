@@ -13,7 +13,7 @@
 
 @layer base {
   body {
-    @apply bg-brand-offwhite text-brand-dark font-sans antialiased selection:bg-brand-dark selection:text-white;
+    @apply text-brand-dark font-sans antialiased selection:bg-brand-dark selection:text-white;
   }
   
   h1, h2, h3, h4, h5, h6 {
