@@ -205,7 +205,7 @@ export default function Portfolio() {
           transition={{ duration: 0.4 }}
         >
           {activeTab === "VIDEO" ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {videos.map((video, idx) => (
                 <motion.div
                   key={video.src}
@@ -217,7 +217,7 @@ export default function Portfolio() {
                     e.stopPropagation();
                     setSelectedVideo(video);
                   }}
-                  className="relative aspect-video overflow-hidden rounded-xl group cursor-pointer bg-brand-dark/5 border border-brand-dark/5 shadow-sm hover:shadow-xl transition-all duration-500"
+                  className="relative aspect-[4/3] overflow-hidden rounded-xl group cursor-pointer bg-brand-dark/5 border border-brand-dark/5 shadow-sm hover:shadow-xl transition-all duration-500"
                 >
                   {video.thumbnail ? (
                     <img

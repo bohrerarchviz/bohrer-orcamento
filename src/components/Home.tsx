@@ -12,7 +12,7 @@ export default function Home({ onNavigate, onPortfolio }: HomeProps) {
   const { t } = useLanguage();
 
   return (
-    <div className="flex flex-col items-center justify-center gap-8 py-6 md:py-0">
+    <div className="flex-1 flex flex-col items-center justify-center gap-8 py-6 md:py-0">
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

@@ -361,9 +361,9 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
     const form = e.currentTarget;
     const formDataObj = new FormData(form);
     
-    // Add relevant files to FormData
+    // Add relevant files to FormData with the name "anexo" as requested
     formData.relevantFiles.forEach((file) => {
-      formDataObj.append("relevantFiles[]", file);
+      formDataObj.append("anexo", file);
     });
     
     // Add formattedEmailBody
@@ -891,7 +891,7 @@ ${formData.additionalNotes || (language === "pt" ? "Nenhuma observação adicion
                   
                   <FileUpload 
                     label="Anexar documentos relevantes (PDF, DWG, referências, etc.)" 
-                    name="relevantFiles"
+                    name="anexo"
                     files={formData.relevantFiles} 
                     onFilesChange={(files) => updateField("relevantFiles", files)} 
                   />

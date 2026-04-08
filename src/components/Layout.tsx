@@ -56,7 +56,7 @@ export default function Layout({ children, onBack, showBack, maxWidth = "max-w-3
         </motion.div>
       </header>
 
-      <main className="flex-1 flex flex-col justify-center py-2 md:py-0">
+      <main className="flex-1 flex flex-col py-2 md:py-0">
         {showBack && (
           <div className={cn(maxWidth, "mx-auto w-full")}>
             <button 
