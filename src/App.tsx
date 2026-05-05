@@ -15,8 +15,8 @@ function AppContent() {
   const { language } = useLanguage();
 
   const portfolioUrls = {
-    pt: "https://drive.google.com/file/d/1cY7B-UtcDtekNHSFf3I8bYmosw0vNfbV/view?usp=sharing",
-    en: "https://drive.google.com/file/d/19s6qsER2Ysu7ROOPDNxBEc0xfXvZrDFE/view?usp=sharing"
+    pt: "https://drive.google.com/file/d/1DNyXKvWcLSNhrwB-iseSjIZuuUAzDyQp/view?usp=sharing",
+    en: "https://drive.google.com/file/d/1xD1YpNKfaJdL9rnEivzLPK4o-7UFTHni/view?usp=sharing"
   };
 
   const handlePortfolio = () => {
